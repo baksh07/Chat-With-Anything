@@ -1,3 +1,5 @@
+from kafka import KafkaConsumer, KafkaProducer
+from send_post import LingoVoiceProcessor
 import json
 import logging
 import signal
@@ -15,45 +17,92 @@ from pathlib import Path
 from psycopg2 import pool
 from psycopg2 import sql
 import psycopg2
-from langchain.retrievers import MultiVectorRetriever, EnsembleRetriever
-
+from langchain.retrievers import MultiVectorRetriever
 from openai import OpenAI
-from logger_config import setup_logger
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
-
-
-
-class VocallyChatPipeline:
+class KafkaLingoBridge:
     def __init__(self):
         self.openai_client = OpenAI(
-            api_key="sandlogic",
-            base_url="http://216.48.182.241:3535/v1",  
+            base_url="https://api.groq.com/openai/v1",
+            api_key=os.environ["GROQ_API_KEY"]
         )
-        self.logger = setup_logger("VocallyChatPipeline")
-        self.logger.info("loading data")
+        self.running = True
+        self.kafka_config = {
+            'bootstrap_servers': ['216.48.183.140:9092'],
+            'input_topic': 'chat-input-query',
+            'output_topic': 'chat_ai_output_query'
+        }
         self.load_data = LoadData()
-        self.chroma_persist_dir = str(Path(__file__).resolve().parent / "chroma_db")
-        self.logger.info(f"Chroma persist directory set to: {self.chroma_persist_dir}")
+        self.consumer = None
+        self.producer = None
+        project_dir = Path(__file__).resolve().parent
+        self.upload_dir = str(project_dir / "UPLOAD")
+        self.chroma_persist_dir = str(project_dir / "chroma_db")  # Directory to persist Chroma DB
+        self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
+        
+        # Initialize embeddings model
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",
             model_kwargs={'device': 'cpu'}
         )
-        self.logger.info("HuggingFace embeddings initialized.")
+        
+        # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=200
         )
         self.db_pool = pool.SimpleConnectionPool(
             1, 10,  # Min and max connections
-            dbname='vocally',
+            dbname='Unifile_Chat',
             user="slaif",
             password="DEV!n$tanc3",
             host='91.203.132.196',
             port=5432
         )
-        self.logger.info("Database connection pool initialized.")
 
+
+
+    def initialize(self):
+        try:
+            self.consumer = KafkaConsumer(
+                self.kafka_config['input_topic'],
+                bootstrap_servers=self.kafka_config['bootstrap_servers'],
+                auto_offset_reset='latest',
+                enable_auto_commit=True,
+                group_id='chat-group',
+                value_deserializer=lambda x: json.loads(x.decode('utf-8')))
+            
+            self.producer = KafkaProducer(
+                bootstrap_servers=self.kafka_config['bootstrap_servers'],
+                value_serializer=lambda v: json.dumps(v).encode('utf-8'))
+            
+            logger.info("Kafka consumer and producer initialized successfully.")
+        except Exception as e:
+            logger.error(f"Initialization failed: {str(e)}")
+            raise
+
+    def shutdown(self):
+        logger.info("Shutting down Kafka service...")
+        self.running = False
+        if self.consumer:
+            self.consumer.close()
+        if self.producer:
+            self.producer.flush()
+            self.producer.close()
+        logger.info("Shutdown complete.")
+
+    # Database connection function
     def connect_to_db(self):
         try:
             return self.db_pool.getconn()
@@ -91,11 +140,9 @@ class VocallyChatPipeline:
 
     def process_message(self, message):
         try:
-            # print(100*"=")
-            # print("Processing message:", message)
-            # print(100*"=")
-            self.logger.info(f"Processing message: {message}")
-            message = message[0]
+            print(100*"=")
+            print("Processing message:", message)
+            print(100*"=")
             query = message.get('query')  # This actually contains the file URL
             chat_id = message.get('chat_id')
             uniqueId = message.get('uniqueId')
@@ -103,7 +150,7 @@ class VocallyChatPipeline:
 
             #get chat history
             chat_history = self.extract_chathistory(chat_id)
-            self.logger.info(f"retreived chat history: {chat_history}")
+            
             retrievers = []
             for uid in uniqueId:
                 try:
@@ -113,38 +160,22 @@ class VocallyChatPipeline:
                         embedding_function=self.embeddings
                     )
                     retrievers.append(vectorstore.as_retriever())
-                    self.logger.info(f"Successfully loaded retriever for collection: {uid}")
-                    # print(f"Successfully loaded retriever for collection: {uid}")
+                    logger.info(f"Successfully loaded retriever for collection: {uid}")
                 except Exception as e:
-                    # print(f"Error loading collection {uid}: {str(e)}")
-                    self.logger.error(f"Error loading collection {uid}: {str(e)}")
+                    logger.error(f"Error loading collection {uid}: {str(e)}")
                     continue
             
             # Create a multi-vector retriever that combines all retrievers
             if not retrievers:
                 raise ValueError("No valid retrievers could be created from the provided unique IDs")
                 
-            # retrievers = [vs.as_retriever() for vs in retrievers]
-            # mretriever = MultiVectorRetriever(retrievers=retrievers)
+            mretriever = MultiVectorRetriever(retrievers=retrievers)
             # Retrieve relevant documents
-            # db_res = mretriever.get_relevant_documents(query)
-            # Combine them with EnsembleRetriever
-            ensemble_retriever = EnsembleRetriever(
-                retrievers=retrievers,
-                weights=[1.0/len(retrievers)] * len(retrievers)  # Equal weights
-            )
-
-            # Get documents
-            db_res = ensemble_retriever.get_relevant_documents(query)
+            db_res = mretriever.get_relevant_documents(query)
             
             # Format the retrieved documents
             formatted_db_res = "\n".join([doc.page_content for doc in db_res])
-            # print(100*"=")
-            # print(f"Formatted database results: {formatted_db_res}")
-            # print(100*"=")
-            self.logger.info(f"============================================================================================================================================")
-            self.logger.info(f"Formatted database results: {formatted_db_res}")
-            self.logger.info(f"============================================================================================================================================")
+
             # Create the prompt with all components
             prompt = f"""
             INPUT DATA:
@@ -165,33 +196,26 @@ class VocallyChatPipeline:
             Keep the follow-up contextual and engaging
             Avoid mechanical or overly formal phrasing
 
-            INSTRUCTIONS:
-            -Only answer question based on the database query results and chat history, donot generate any other information.
+            INSTRUCTIONS: 
             -Do not use phrases like: 'here is the reponse:' etc to give your answer.
             -Give one followup question only. not more.
             """    
-            self.logger.info(f"going inside llm groq input: {prompt}")
-            try:
-                stream = self.openai_client.chat.completions.create(
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": prompt
-                            },
-                            {
-                                "role": "user",
-                                "content": f"The chat history is: {chat_history}. The user query is: {query}"
-                            }
-                        ],
-                        model="llama-3.3-70b-versatile",
-                        extra_body={
-                        "chat_template_kwargs": {"enable_thinking": False}},
 
-                    )
-                full_response = stream.choices[0].message.content
-                print(f"Generated response: {full_response}")
-            except Exception as e:
-                self.logger.info(f"error while generating response: {str(e)}")
+            stream = self.openai_client.chat.completions.create(
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": prompt
+                        },
+                        {
+                            "role": "user",
+                            "content": f"{query}"
+                        }
+                    ],
+                    model="llama-3.3-70b-versatile",
+
+                )
+            full_response = stream.choices[0].message.content
 
             print(f"Reply: {full_response}")
             response_payload = {
@@ -200,22 +224,48 @@ class VocallyChatPipeline:
                     "result": full_response,
                     "metadata": "metadata"
                 }
-            return response_payload
+            self.producer.send(self.kafka_config['output_topic'], response_payload)
+            logger.info(f"Published result to {self.kafka_config['output_topic']}")
+
         except Exception as e:
-            self.logger.error(f"Error processing message: {str(e)}")
+            logger.error(f"Error processing message: {str(e)}")
             # Optionally send an error response
             error_payload = {
-                    "query": query,
-                    "status": "Failed",
-                    "result": "",
-                    "metadata": "metadata"
-                    }
-            return error_payload
-        
+                "error": str(e),
+                "metadata": "metadata",
+                "status": "error"
+            }
+            self.producer.send(self.kafka_config['output_topic'], error_payload)
+
+    def run(self):
+        try:
+            self.initialize()
+            logger.info("Listening for messages...")
+
+            while self.running:
+                message_batch = self.consumer.poll(timeout_ms=1000)
+                for topic_partition, messages in message_batch.items():
+                    for message in messages:
+                        if not self.running:
+                            break
+                        self.process_message(message.value)
+
+        except Exception as e:
+            logger.error(f"Fatal error: {str(e)}")
+        finally:
+            self.shutdown()
+
+
+def setup_signal_handlers(service):
+    def handler(signum, frame):
+        logger.info(f"Received signal {signum}, shutting down...")
+        service.shutdown()
+
+    signal.signal(signal.SIGINT, handler)
+    signal.signal(signal.SIGTERM, handler)
+
 
 if __name__ == "__main__":
-    vocally_chat_pipeline = VocallyChatPipeline()
-    # Example message to process
-    example_message = [{'query': "what's the comparison about other years", 'noteRef': [764], 'chat_id': '468', 'uniqueId': ['8f3678cf-864a-477c-a1af-0c299f1a68ad']}]    
-    response = vocally_chat_pipeline.process_message(example_message)
-    print("Response:", response)
+    bridge = KafkaLingoBridge()
+    setup_signal_handlers(bridge)
+    bridge.run()

@@ -2,7 +2,7 @@
 import logging
 import os
 
-LOG_PATH = "logs/vocally_combined.log"
+LOG_PATH = "logs/chat_combined.log"
 
 def setup_logger(name: str) -> logging.Logger:
     os.makedirs("logs", exist_ok=True)

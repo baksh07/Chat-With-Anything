@@ -1,4 +1,4 @@
-# Quick Start Guide - Vocally Batch Project
+# Quick Start Guide - Chat With Anything
 
 ## Prerequisites
 - Conda environment `RTA` is set up and activated
@@ -7,29 +7,23 @@
 
 ## Starting the System with TMUX
 
-### Option 1: Automated TMUX Setup
-```bash
-# Run this script to automatically create and configure tmux sessions
-./start_vocally_batch.sh
-```
-
-### Option 2: Manual TMUX Setup
+### Manual TMUX Setup
 ```bash
 # 1. Create new tmux session
-tmux new-session -d -s vocally_batch
+tmux new-session -d -s chat_with_anything
 
 # 2. Split the session horizontally
 tmux split-window -h
 
 # 3. Configure first pane (Query Processing)
 tmux send-keys -t 0 "conda activate RTA" Enter
-tmux send-keys -t 0 "cd /mnt/data2/vocally_batch" Enter
-tmux send-keys -t 0 "python vocally_batch_query_processing.py" Enter
+tmux send-keys -t 0 "cd /mnt/data2/chat_with_anything" Enter
+tmux send-keys -t 0 "python chat_batch_query_processing.py" Enter
 
 # 4. Configure second pane (BentoML Service)
 tmux send-keys -t 1 "conda activate RTA" Enter
-tmux send-keys -t 1 "cd /mnt/data2/vocally_batch" Enter
-tmux send-keys -t 1 "bentoml serve service:VocallyChatService" Enter
+tmux send-keys -t 1 "cd /mnt/data2/chat_with_anything" Enter
+tmux send-keys -t 1 "bentoml serve service:ChatService" Enter
 ```
 
 ## TMUX Session Management
@@ -37,10 +31,10 @@ tmux send-keys -t 1 "bentoml serve service:VocallyChatService" Enter
 ### Attach to Session
 ```bash
 # Attach to the running session
-tmux attach-session -t vocally_batch
+tmux attach-session -t chat_with_anything
 
 # Or use the shorter form
-tmux a -t vocally_batch
+tmux a -t chat_with_anything
 ```
 
 ### Navigate Between Panes
@@ -64,7 +58,7 @@ tmux ls
 ### Kill Session
 ```bash
 # Kill the session (stops all processes)
-tmux kill-session -t vocally_batch
+tmux kill-session -t chat_with_anything
 ```
 
 ## Manual Session Management (Alternative to TMUX)
@@ -75,10 +69,10 @@ tmux kill-session -t vocally_batch
 conda activate RTP
 
 # Navigate to project directory
-cd /mnt/data2/vocally_batch
+cd /mnt/data2/chat_with_anything
 
 # Start document processing
-python vocally_batch_processing_version5.py
+python chat_batch_processing_version5.py
 ```
 
 ### Terminal 2: BentoML Service
@@ -87,10 +81,10 @@ python vocally_batch_processing_version5.py
 conda activate RTA
 
 # Navigate to project directory
-cd /mnt/data2/vocally_batch
+cd /mnt/data2/chat_with_anything
 
 # Start BentoML service
-bentoml serve service:VocallyChatService
+bentoml serve service:ChatService
 ```
 
 ## Verification Commands
@@ -101,7 +95,7 @@ bentoml serve service:VocallyChatService
 ps aux | grep python | grep -v grep
 
 # Check specific processes
-ps aux | grep vocally_batch_query_processing
+ps aux | grep chat_batch_query_processing
 ps aux | grep bentoml
 
 # Check listening ports
@@ -111,11 +105,11 @@ netstat -tlnp | grep :8000  # BentoML default port
 ### Check Logs
 ```bash
 # Real-time log monitoring
-tail -f logs/vocally_combined.log
+tail -f logs/chat_combined.log
 
 # Check specific log files
-tail -f logs/vocally_chat_pipeline.log
-tail -f logs/vocally_chat_service.log
+tail -f logs/chat_pipeline.log
+tail -f logs/chat_service.log
 ```
 
 ### Test API Endpoint
@@ -163,8 +157,8 @@ kill -9 <PID>
 #### 3. Permission Denied
 ```bash
 # Fix directory permissions
-chmod -R 755 /mnt/data2/vocally_batch/
-chown -R $USER:$USER /mnt/data2/vocally_batch/
+chmod -R 755 /mnt/data2/chat_with_anything/
+chown -R $USER:$USER /mnt/data2/chat_with_anything/
 ```
 
 #### 4. Import Errors
@@ -183,9 +177,9 @@ pip install --upgrade langchain chromadb
 # Create a health check script
 cat > health_check.sh << 'EOF'
 #!/bin/bash
-echo "=== Vocally Batch Health Check ==="
+echo "=== Chat With Anything Health Check ==="
 echo "1. Checking Python processes..."
-ps aux | grep python | grep -v grep | grep vocally
+ps aux | grep python | grep -v grep | grep chat
 echo ""
 echo "2. Checking BentoML service..."
 curl -s http://localhost:8000/health || echo "Service not responding"
@@ -194,7 +188,7 @@ echo "3. Checking log files..."
 ls -la logs/ | head -5
 echo ""
 echo "4. Checking disk space..."
-df -h /mnt/data2/vocally_batch
+df -h /mnt/data2/chat_with_anything
 EOF
 
 chmod +x health_check.sh
@@ -207,13 +201,13 @@ chmod +x health_check.sh
 ```bash
 # In tmux session, use Ctrl+C in each pane
 # Or kill the session
-tmux kill-session -t vocally_batch
+tmux kill-session -t chat_with_anything
 ```
 
 ### Force Shutdown
 ```bash
 # Kill all related processes
-pkill -f vocally_batch_query_processing
+pkill -f chat_batch_query_processing
 pkill -f bentoml
 ```
 

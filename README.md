@@ -1,4 +1,4 @@
-# VoiceFlow AI - Intelligent Document Processing & Voice Assistant
+# Chat With Anything - Intelligent Document Processing & Chat Assistant
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
@@ -16,7 +16,7 @@
 
 ## Project Overview
 
-VoiceFlow AI is a comprehensive document processing and AI-powered voice assistant system that combines advanced document ingestion, vector storage, and intelligent query processing. The system processes various document formats, creates vector embeddings for semantic search, and provides intelligent responses through an LLM-powered chat interface with voice capabilities.
+Chat With Anything is a document processing and AI-powered chat system that combines document ingestion, vector storage, and intelligent query processing. It processes various document formats, creates vector embeddings for semantic search, and provides responses through an LLM-powered chat interface.
 
 ### Key Features
 
@@ -89,11 +89,11 @@ The system follows a microservices architecture with the following components:
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd alternative-to-magic-chat
+cd chat-with-anything
 
 # Create conda environment
-conda create -n voiceflow python=3.8
-conda activate voiceflow
+conda create -n chat-with-anything python=3.8
+conda activate chat-with-anything
 
 # Install dependencies
 pip install -r requirements.txt
@@ -104,9 +104,9 @@ pip install -r requirements.txt
 Set up PostgreSQL database:
 
 ```sql
-CREATE DATABASE voiceflow_db;
-CREATE SCHEMA voiceflow_schema;
-CREATE TABLE voiceflow_schema.message (
+CREATE DATABASE Unifile_Chat;
+CREATE SCHEMA chat_schema;
+CREATE TABLE chat_schema.message (
     id SERIAL PRIMARY KEY,
     chat_id VARCHAR(255),
     query TEXT,
@@ -130,14 +130,14 @@ Create a `.env` file:
 # Database Configuration
 DB_HOST=localhost
 DB_PORT=5432
-DB_NAME=voiceflow_db
+DB_NAME=Unifile_Chat
 DB_USER=your_username
 DB_PASSWORD=your_password
 
 # Kafka Configuration (optional)
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-KAFKA_INPUT_TOPIC=voiceflow_input
-KAFKA_OUTPUT_TOPIC=voiceflow_output
+KAFKA_INPUT_TOPIC=chat-input
+KAFKA_OUTPUT_TOPIC=chat_ai_output
 
 # API Keys
 OPENAI_API_KEY=your_openai_key
@@ -155,14 +155,14 @@ loads `GROQ_API_KEY` from that file; do not commit real API keys.
 ## Project Structure
 
 ```
-voiceflow-ai/
+chat-with-anything/
 ├── README.md                           # This documentation
 ├── requirements.txt                    # Python dependencies
 ├── .env                               # Environment variables
 ├── service.py                         # BentoML service definition
-├── vocally_chat_pipeline.py          # Core chat processing logic
+├── chat_pipeline.py                  # Core chat processing logic
 ├── data_ingestion_pipeline.py        # Document processing pipeline
-├── vocally_batch_processing_version5.py # Main processing pipeline
+├── chat_batch_processing_version5.py # Main processing pipeline
 ├── send_post.py                      # Audio processing integration
 ├── logger_config.py                  # Logging configuration
 ├── client.py                         # Client utilities
@@ -181,7 +181,7 @@ voiceflow-ai/
 ## Core Components
 
 ### 1. Document Processing Pipeline
-**File**: `vocally_batch_processing_version5.py`
+**File**: `chat_batch_processing_version5.py`
 
 **Purpose**: Kafka consumer that processes document uploads, extracts text, and stores embeddings in ChromaDB
 
@@ -201,7 +201,7 @@ voiceflow-ai/
 - **Text**: Direct text input
 
 ### 2. Chat Pipeline
-**File**: `vocally_chat_pipeline.py`
+**File**: `chat_pipeline.py`
 
 **Purpose**: Core logic for processing chat messages and generating responses
 
@@ -269,30 +269,30 @@ max_tokens=4096
 
 ```bash
 # Create new tmux session
-tmux new-session -d -s voiceflow
+tmux new-session -d -s chat-with-anything
 
 # Split session into two panes
 tmux split-window -h
 
 # First pane: Start document processing
-tmux send-keys -t 0 "conda activate voiceflow" Enter
-tmux send-keys -t 0 "python vocally_batch_processing_version5.py" Enter
+tmux send-keys -t 0 "conda activate chat-with-anything" Enter
+tmux send-keys -t 0 "python chat_batch_processing_version5.py" Enter
 
 # Second pane: Start API service
-tmux send-keys -t 1 "conda activate voiceflow" Enter
-tmux send-keys -t 1 "bentoml serve service:VocallyChatService" Enter
+tmux send-keys -t 1 "conda activate chat-with-anything" Enter
+tmux send-keys -t 1 "bentoml serve service:ChatService" Enter
 ```
 
 #### Option 2: Manual Session Management
 
 ```bash
 # Terminal 1: Document Processing
-conda activate voiceflow
-python vocally_batch_processing_version5.py
+conda activate chat-with-anything
+python chat_batch_processing_version5.py
 
 # Terminal 2: API Service
-conda activate voiceflow
-bentoml serve service:VocallyChatService
+conda activate chat-with-anything
+bentoml serve service:ChatService
 ```
 
 ### Document Processing Workflow
@@ -317,7 +317,7 @@ import requests
 
 # Send query through API
 response = requests.post('http://localhost:8000/chat/completions', json={
-    "model": "voiceflow-llm",
+    "model": "chat-with-anything-llm",
     "messages": [{
         "query": "What is the main topic?",
         "noteRef": [123],
@@ -337,7 +337,7 @@ response = requests.post('http://localhost:8000/chat/completions', json={
 **Request Body**:
 ```json
 {
-    "model": "voiceflow-llm",
+    "model": "chat-with-anything-llm",
     "messages": [
         {
             "query": "What is the document about?",
@@ -358,7 +358,7 @@ response = requests.post('http://localhost:8000/chat/completions', json={
     "id": "chat_1234567890",
     "object": "chat.completion",
     "created": 1640995200,
-    "model": "voiceflow-llm",
+    "model": "chat-with-anything-llm",
     "choices": [{
         "message": {
             "role": "assistant",
@@ -389,7 +389,7 @@ response = requests.post('http://localhost:8000/chat/completions', json={
 conda env list
 
 # Create environment if it doesn't exist
-conda create -n voiceflow python=3.8
+conda create -n chat-with-anything python=3.8
 ```
 
 #### 2. Port Already in Use
@@ -413,7 +413,7 @@ pip install -r requirements.txt --force-reinstall
 sudo systemctl status postgresql
 
 # Test connection
-psql -h localhost -U your_username -d voiceflow_db
+psql -h localhost -U your_username -d Unifile_Chat
 ```
 
 ### Logging
@@ -422,11 +422,11 @@ Check logs for debugging:
 
 ```bash
 # Real-time log monitoring
-tail -f logs/voiceflow_combined.log
+tail -f logs/chat_combined.log
 
 # Check specific log files
-tail -f logs/voiceflow_chat_pipeline.log
-tail -f logs/voiceflow_service.log
+tail -f logs/chat_pipeline.log
+tail -f logs/chat_service.log
 ```
 
 ## Contributing
@@ -450,4 +450,4 @@ For support and questions:
 
 ---
 
-**VoiceFlow AI** - Transforming documents into intelligent conversations through advanced AI and voice processing technology.
+**Chat With Anything** - Transforming documents into intelligent conversations through advanced AI.

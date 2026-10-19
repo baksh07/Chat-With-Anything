@@ -22,7 +22,7 @@ from SERVICES.web_scrape_service import WebScraper
 from myproject.runner import scrape_with_cli
 
 # Configure logging
-log_file_path = "logs/vocally_data_ingestion_pipeline.log"
+log_file_path = "logs/chat_data_ingestion_pipeline.log"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -40,8 +40,8 @@ class KafkaLingoBridge:
         self.running = True
         self.kafka_config = {
             'bootstrap_servers': ['216.48.183.140:9092'],
-            'input_topic': 'vocally_input',
-            'output_topic': 'vocally_ai_output'
+            'input_topic': 'chat-input',
+            'output_topic': 'chat_ai_output'
         }
         self.load_data = LoadData()
         self.consumer = None
@@ -50,10 +50,10 @@ class KafkaLingoBridge:
         self.upload_dir = str(project_dir / "UPLOAD")
         self.chroma_persist_dir = str(project_dir / "chroma_db")
         self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
-        self.scraped_json_path = "/mnt/data2/vocally_batch/myproject" 
+        self.scraped_json_path = str(project_dir / "myproject")
         # LLM client for summarization
         self.llm_client = OpenAI(
-            api_key="sandlogic-llm",
+            api_key="local-llm",
             base_url="http://164.52.196.111:3005"  # Replace with actual LLM URL
         )
         self.document = Document()
@@ -165,7 +165,7 @@ class KafkaLingoBridge:
                 bootstrap_servers=self.kafka_config['bootstrap_servers'],
                 auto_offset_reset='latest',
                 enable_auto_commit=True,
-                group_id='vocally-group',
+                group_id='chat-group',
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')))
             
             self.producer = KafkaProducer(
@@ -188,46 +188,46 @@ class KafkaLingoBridge:
         logger.info("Shutdown complete.")
 
     def process_message(self, message):
-        already_published = False
-
         try:
-            print("=" * 100)
+            print(100*"=")
             print("Processing message:", message)
-            print("=" * 100)
-
-            file_url = message.get('audio_url')
+            print(100*"=")
+            file_url = message.get('audio_url')  # This actually contains the file URL
             metadata = message.get('metadata')
-            unique_id = metadata.get("uniqueId")
-            file_type = metadata.get("file_type", "").lower()
-            title = None
-
+            unique_id = metadata["uniqueId"]
+            file_type = metadata["file_type"].lower()
+            title = None  # Initialize title variable
+            
             logger.info(f"Processing message with unique ID: {unique_id}")
 
-            document_types = ["pdf", "ppt", "pptx", "doc", "docx", "txt", "text"]
-            audio_types = ["mp3", "wav", "m4a", "ogg", "flac", "opus", "aac", "amr", "wma", "webm", "alac"]
-            text = ""
-
-            # If it's not audio/link/text type, we assume it's a file to download
-            if file_type not in audio_types + ["link", "text"]:
+            if file_type in ['mp3', 'link', 'text', "wav", "m4a", "flac", "aac", "ogg", "webm", "wma", "alac", "opus" ]:
+                pass
+            else: 
+            # if file_type != "mp3" or file_type != "link" or file_type != "text":
+                # Download the file first
                 date = datetime.today().strftime("%Y-%m-%d")
                 filename = f"{unique_id}_{date}.{file_type}"
-                file_path = os.path.join(self.upload_dir, filename)
-
+                file_path = f"{self.upload_dir}/{filename}"
+                
                 logger.info(f"Downloading {file_type} file from {file_url}")
                 response = requests.get(file_url)
                 with open(file_path, 'wb') as f:
                     f.write(response.content)
                 logger.info(f"Saved file to: {file_path}")
-
-            # ========== TEXT/FILE HANDLING ==========
+            
+            # Process the file based on its type
+            text = ""
+            
             if file_type == "pdf":
                 text = self.load_data.load_pdf(file_path)
-
+                
             elif file_type in ["ppt", "pptx"]:
-                text = self.load_data.load_ppt(file_path)
 
+                text = self.load_data.load_ppt(file_path)
+                
             elif file_type in ["doc", "docx"]:
                 if file_type == "doc":
+                    #logging
                     logger.info(f"Converting DOC to DOCX for file: {file_path}")
                     self.document.LoadFromFile(file_path)
                     new_file_path = file_path.replace('.doc', '.docx')
@@ -235,23 +235,23 @@ class KafkaLingoBridge:
                     text = self.load_data.load_word(new_file_path)
                 else:
                     text = self.load_data.load_word(file_path)
-
+                
             elif file_type == "txt":
                 text = self.load_data.load_text(file_path)
 
             elif file_type == "text":
-                text_file = os.path.join(self.upload_dir, f"{unique_id}.txt")
+                text_file = f"{self.upload_dir}/{unique_id}.txt"
                 with open(text_file, "w", encoding="utf-8") as file:
                     file.write(file_url)
                 text = self.load_data.load_text(text_file)
-
-            elif file_type in audio_types:
+                
+            elif file_type == "mp3" or file_type == "wav" or file_type == "m4a" or file_type == "ogg" or file_type == "flac" or file_type == "opus" or file_type == "aac" or file_type == "amr":                                                                                                    
                 if not file_url:
                     raise ValueError("Missing 'audio_url' in the message.")
+
                 logger.info(f"Processing audio URL: {file_url}")
                 result = self.processor.process_audio_url(file_url)
                 text = result['response']['results']['transcription']
-
                 response_payload = {
                     "input_audio_url": file_url,
                     "status": "success",
@@ -259,73 +259,79 @@ class KafkaLingoBridge:
                     "metadata": metadata
                 }
 
-                if not already_published:
-                    self.producer.send(self.kafka_config['output_topic'], response_payload)
-                    already_published = True
-                    logger.info(f"Published result to {self.kafka_config['output_topic']}")
+                self.producer.send(self.kafka_config['output_topic'], response_payload)
+                logger.info(f"Published result to {self.kafka_config['output_topic']}")
 
             elif file_type == "link":
                 if not file_url:
                     raise ValueError("Missing 'audio_url' in the message.")
-
                 logger.info(f"Processing web link: {file_url}")
                 scrape_result_old = self.scraper.scrape(file_url)
-                json_path = os.path.join(self.scraped_json_path, f"{unique_id}.json")
-
-                if os.path.exists(json_path):
-                    logger.info(f"Scraped JSON already exists at {json_path}, loading it.")
-                    scraped_json = self.load_json_to_dict(json_path)
+                path = f"{self.scraped_json_path}/{unique_id}.json"
+                
+                if os.path.exists(path):
+                    logger.info(f"Scraped JSON already exists at {path}, loading existing data.")
+                    scraped_json = self.load_json_to_dict(path)
+                    text = scraped_json[0]['text']
+                    logger.info(f"Extracted text from web link: {text[:100]}...")  # Log first 100 chars
                 else:
-                    logger.info(f"Scraped JSON not found at {json_path}, running CLI scraper.")
-                    scrape_with_cli(file_url, id=unique_id)
-                    scraped_json = self.load_json_to_dict(json_path)
+                    logger.info(f"Scraped JSON does not exist at {path}, scraping the web link.")
+                    scrape_result = scrape_with_cli(file_url, id=unique_id)
+                    logger.info(f"Scrape result: {scrape_result}")
+                    scraped_json = self.load_json_to_dict(path)
+                    text = scraped_json[0]['text']
+                    logger.info(f"Extracted text from web link: {text[:100]}...")  # Log first 100 chars
 
-                text = scraped_json[0]['text']
+                # for item in scrape_result:
+                #     text = final_output + " " + item.get("text")
                 if not text:
                     raise ValueError("No text extracted from the web link.")
-
-                TEXT2, title = scrape_result_old
+                TEXT2 , title = scrape_result_old
                 if metadata is not None:
                     metadata["title"] = title
-
+                
             else:
                 logger.warning(f"Unsupported file type: {file_type}")
                 return
-
-            # ========== SAVE TO CHROMA ==========
-            saved = self.save_to_chroma(text, collection_name=unique_id, metadata=metadata)
-            if saved:
-                logger.info(f"Text saved to Chroma DB for unique ID: {unique_id}")
-
-            # ========== TEXT RESULT PUBLISH ==========
-            if not already_published and file_type in document_types + ["link", "text"]:
-                text_for_summary = text[:2000]
-                result = self.processor.process_text(text_for_summary)
-
-                if title is not None:
-                    result['response']['results']['title'] = title
-
-                response_payload = {
+            
+            try:
+                self.save_to_chroma(text, collection_name=unique_id, metadata=metadata)
+                logger.info(f"Successfully saved text to Chroma DB for unique ID: {unique_id}")
+                if file_type in ["pdf", "ppt", "pptx", "doc", "docx", "txt", "link", "text"]:
+                    text_for_summary = text[:2000]
+                    result = self.processor.process_text(text_for_summary)
+                    # Only set title if it exists
+                    if title is not None:
+                        result['response']['results']['title'] = title
+                    response_payload = {
+                        "input_file_url": file_url,
+                        "status": "success",
+                        "result": result,
+                        "metadata": metadata
+                    }
+                    self.producer.send(self.kafka_config['output_topic'], response_payload)
+                    logger.info(f"Published result to {self.kafka_config['output_topic']}")
+            except Exception as e:
+                logger.error(f"Error saving to Chroma DB: {str(e)}")
+                # Optionally send an error response
+                error_payload = {
                     "input_file_url": file_url,
-                    "status": "success",
-                    "result": result,
+                    "status": "failed",
+                    "result": str(e),
                     "metadata": metadata
                 }
-
-                self.producer.send(self.kafka_config['output_topic'], response_payload)
-                already_published = True
-                logger.info(f"Published result to {self.kafka_config['output_topic']}")
+                self.producer.send(self.kafka_config['output_topic'], error_payload)
+                
 
         except Exception as e:
             logger.error(f"Error processing message: {str(e)}")
+            # Optionally send an error response
             error_payload = {
                 "error": str(e),
-                "metadata": metadata,
+              "metadata": metadata,
                 "status": "error"
             }
-            if not already_published:
-                self.producer.send(self.kafka_config['output_topic'], error_payload)
-
+            self.producer.send(self.kafka_config['output_topic'], error_payload)
 
     def run(self):
         try:

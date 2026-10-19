@@ -1,5 +1,5 @@
 import bentoml
-from vocally_chat_pipeline import VocallyChatPipeline
+from chat_pipeline import ChatPipeline
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 from starlette.responses import StreamingResponse
@@ -57,13 +57,13 @@ async def _resp_async_generator(text_resp: str):
     },
     workers=2
 )
-class VocallyChatService:
+class ChatService:
     def __init__(self):
-        self.pipeline = VocallyChatPipeline()
+        self.pipeline = ChatPipeline()
         # Set up centralized logger
-        self.logger = setup_logger("VocallyChatService")
+        self.logger = setup_logger("ChatService")
 
-        self.logger.info("VocallyChatService initialized.")
+        self.logger.info("ChatService initialized.")
 
     @bentoml.api(route="/chat/completions")
     async def chat_completions(self, messages: List[Message], model: str, stream: bool = False):

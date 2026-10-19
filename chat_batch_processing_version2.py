@@ -28,8 +28,8 @@ class KafkaLingoBridge:
         self.running = True
         self.kafka_config = {
             'bootstrap_servers': ['216.48.183.140:9092'],
-            'input_topic': 'vocally_input',
-            'output_topic': 'vocally_ai_output'
+            'input_topic': 'chat-input',
+            'output_topic': 'chat_ai_output'
         }
         self.load_data = LoadData()
         self.consumer = None
@@ -95,7 +95,7 @@ class KafkaLingoBridge:
                 bootstrap_servers=self.kafka_config['bootstrap_servers'],
                 auto_offset_reset='latest',
                 enable_auto_commit=True,
-                group_id='vocally-group',
+                group_id='chat-group',
                 value_deserializer=lambda x: json.loads(x.decode('utf-8')))
             
             self.producer = KafkaProducer(
