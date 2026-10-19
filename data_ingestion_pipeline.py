@@ -3,6 +3,7 @@ from unstructured.partition.pdf import partition_pdf
 from pptx import Presentation
 import pandas as pd
 import os
+from pathlib import Path
 import tempfile
 from typing import Union, List, Dict, Optional
 import requests
@@ -163,7 +164,7 @@ class DataProcessor:
 if __name__ == "__main__":
 
     loader = LoadData()
-    file_path = '/mnt/data/vocally_batch/UPLOAD/b1fdcbd0-0a03-4313-b0c7-0a6b5e9814ee_2025-05-26.ppt'
+    file_path = Path(__file__).resolve().parent / "UPLOAD" / "b1fdcbd0-0a03-4313-b0c7-0a6b5e9814ee_2025-05-26.ppt"
     result = loader.load_ppt(file_path)
     print(result)
     

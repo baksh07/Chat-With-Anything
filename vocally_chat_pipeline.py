@@ -11,6 +11,7 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document as LangchainDocument
 import os
+from pathlib import Path
 from psycopg2 import pool
 from psycopg2 import sql
 import psycopg2
@@ -32,7 +33,7 @@ class VocallyChatPipeline:
         self.logger = setup_logger("VocallyChatPipeline")
         self.logger.info("loading data")
         self.load_data = LoadData()
-        self.chroma_persist_dir = "/mnt/data2/vocally_batch/chroma_db"  # Directory to persist Chroma DB
+        self.chroma_persist_dir = str(Path(__file__).resolve().parent / "chroma_db")
         self.logger.info(f"Chroma persist directory set to: {self.chroma_persist_dir}")
         self.embeddings = HuggingFaceEmbeddings(
             model_name="sentence-transformers/all-MiniLM-L6-v2",

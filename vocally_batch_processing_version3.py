@@ -14,6 +14,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document as LangchainDocument
 from langchain.docstore import document
 import os
+from pathlib import Path
 from openai import OpenAI
 from spire.doc import *
 from spire.doc.common import *
@@ -45,10 +46,11 @@ class KafkaLingoBridge:
         self.load_data = LoadData()
         self.consumer = None
         self.producer = None
-        self.upload_dir = "/mnt/data2/vocally_batch/UPLOAD"
-        self.chroma_persist_dir = "/mnt/data2/vocally_batch/chroma_db"
+        project_dir = Path(__file__).resolve().parent
+        self.upload_dir = str(project_dir / "UPLOAD")
+        self.chroma_persist_dir = str(project_dir / "chroma_db")
         self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
-        self.scraped_json_path = "/mnt/data2/vocally_batch/myproject" 
+        self.scraped_json_path = str(project_dir / "myproject")
         # LLM client for summarization
         self.llm_client = OpenAI(
             api_key="sandlogic-llm",

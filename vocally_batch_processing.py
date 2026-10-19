@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 import requests
 from data_ingestion_pipeline import LoadData
+from pathlib import Path
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +28,7 @@ class KafkaLingoBridge:
         self.load_data = LoadData()
         self.consumer = None
         self.producer = None
-        self.upload_dir = "/mnt/data2/vocally_batch/UPLOAD"
+        self.upload_dir = str(Path(__file__).resolve().parent / "UPLOAD")
         self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
 
     def initialize(self):

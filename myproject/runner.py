@@ -3,9 +3,10 @@ import subprocess
 import sys
 import json
 import time
+from pathlib import Path
 def scrape_with_cli(url, id=time.time()):
     try:
-        project_dir = "/mnt/data2/vocally_batch/myproject"
+        project_dir = Path(__file__).resolve().parent
         cmd = [
             sys.executable, "-m", "scrapy",
             "crawl", "text",

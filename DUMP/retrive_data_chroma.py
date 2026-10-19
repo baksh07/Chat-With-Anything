@@ -1,5 +1,6 @@
 from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
+from pathlib import Path
 
 # Load the same embeddings model used during saving
 embeddings = HuggingFaceEmbeddings(
@@ -8,7 +9,7 @@ embeddings = HuggingFaceEmbeddings(
 )
 
 # Directory where Chroma DB is persisted
-persist_directory = "/mnt/data2/vocally_batch/chroma_db"
+persist_directory = str(Path(__file__).resolve().parents[1] / "chroma_db")
 
 # Unique collection name (uniqueId used while saving)
 collection_name = "be9738a8-3a9b-49a5-8e5e-09edd83e0119"
