@@ -3,7 +3,6 @@ from send_post import LingoVoiceProcessor
 import json
 import logging
 import signal
-import sys
 from datetime import datetime
 import requests
 from data_ingestion_pipeline import LoadData
@@ -12,16 +11,14 @@ from langchain.vectorstores import Chroma
 from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document as LangchainDocument
-import os
-from pathlib import Path
 from psycopg2 import pool
 from psycopg2 import sql
 import psycopg2
 from langchain.retrievers import MultiVectorRetriever
 from openai import OpenAI
-from dotenv import load_dotenv
+from settings import Settings
 
-load_dotenv()
+settings = Settings.from_environment()
 
 # Configure logging
 logging.basicConfig(
@@ -33,23 +30,24 @@ logger = logging.getLogger(__name__)
 
 class KafkaLingoBridge:
     def __init__(self):
+        if not settings.groq_api_key:
+            raise RuntimeError("GROQ_API_KEY must be set in the environment or local .env file.")
         self.openai_client = OpenAI(
             base_url="https://api.groq.com/openai/v1",
-            api_key=os.environ["GROQ_API_KEY"]
+            api_key=settings.groq_api_key
         )
         self.running = True
         self.kafka_config = {
-            'bootstrap_servers': ['216.48.183.140:9092'],
-            'input_topic': 'chat-input-query',
-            'output_topic': 'chat_ai_output_query'
+            'bootstrap_servers': settings.kafka_bootstrap_servers,
+            'input_topic': settings.kafka_query_input_topic,
+            'output_topic': settings.kafka_query_output_topic
         }
         self.load_data = LoadData()
         self.consumer = None
         self.producer = None
-        project_dir = Path(__file__).resolve().parent
-        self.upload_dir = str(project_dir / "UPLOAD")
-        self.chroma_persist_dir = str(project_dir / "chroma_db")  # Directory to persist Chroma DB
-        self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
+        self.upload_dir = str(settings.upload_dir)
+        self.chroma_persist_dir = str(settings.chroma_persist_dir)
+        self.processor = LingoVoiceProcessor(settings.processor_audio_url)
         
         # Initialize embeddings model
         self.embeddings = HuggingFaceEmbeddings(
@@ -63,12 +61,7 @@ class KafkaLingoBridge:
             chunk_overlap=200
         )
         self.db_pool = pool.SimpleConnectionPool(
-            1, 10,  # Min and max connections
-            dbname='Unifile_Chat',
-            user="slaif",
-            password="DEV!n$tanc3",
-            host='91.203.132.196',
-            port=5432
+            1, 10, **settings.database_connection_kwargs()
         )
 
 

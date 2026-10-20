@@ -1,5 +1,8 @@
 # Chat With Anything - Intelligent Document Processing & Chat Assistant
 
+> **Project name update:** This project was previously named Vocally and is now
+> named **Chat With Anything** (`chat-with-anything`).
+
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Key Features](#key-features)
@@ -124,33 +127,16 @@ mkdir -p UPLOAD DUMP chroma_db logs SERVICES
 
 ### 4. Environment Variables
 
-Create a `.env` file:
+Copy `.env.example` to `.env` and set the credentials and service URLs for your
+environment. `.env` is ignored by Git; never commit real credentials.
 
 ```bash
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=Unifile_Chat
-DB_USER=your_username
-DB_PASSWORD=your_password
-
-# Kafka Configuration (optional)
-KAFKA_BOOTSTRAP_SERVERS=localhost:9092
-KAFKA_INPUT_TOPIC=chat-input
-KAFKA_OUTPUT_TOPIC=chat_ai_output
-
-# API Keys
-OPENAI_API_KEY=your_openai_key
-GROQ_API_KEY=your_groq_key
-
-# File Paths
-UPLOAD_DIR=./UPLOAD
-CHROMA_PERSIST_DIR=./chroma_db
-LOG_PATH=./logs
+cp .env.example .env
 ```
 
-For local runs, place these settings in a `.env` file. The batch query processor
-loads `GROQ_API_KEY` from that file; do not commit real API keys.
+The chat API reads `DB_*` and `CHAT_LLM_*`; document summarization reads
+`SUMMARY_LLM_*`; the query worker reads `GROQ_API_KEY`. Kafka brokers,
+processor URLs, and data directories are configurable in the same file.
 
 ## Project Structure
 

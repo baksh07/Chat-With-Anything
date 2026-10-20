@@ -13,7 +13,9 @@ from langchain.embeddings import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document as LangchainDocument
 import os
-from pathlib import Path
+from settings import Settings
+
+settings = Settings.from_environment()
 
 # Configure logging
 logging.basicConfig(
@@ -27,17 +29,19 @@ class KafkaLingoBridge:
     def __init__(self):
         self.running = True
         self.kafka_config = {
-            'bootstrap_servers': ['216.48.183.140:9092'],
-            'input_topic': 'chat-input',
-            'output_topic': 'chat_ai_output'
+            'bootstrap_servers': settings.kafka_bootstrap_servers,
+            'input_topic': settings.kafka_input_topic,
+            'output_topic': settings.kafka_output_topic
         }
         self.load_data = LoadData()
         self.consumer = None
         self.producer = None
-        project_dir = Path(__file__).resolve().parent
-        self.upload_dir = str(project_dir / "UPLOAD")
-        self.chroma_persist_dir = str(project_dir / "chroma_db")  # Directory to persist Chroma DB
-        self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
+        self.upload_dir = str(settings.upload_dir)
+        self.chroma_persist_dir = str(settings.chroma_persist_dir)
+        self.processor = LingoVoiceProcessor(
+            settings.processor_audio_url,
+            settings.processor_text_url,
+        )
         
         # Initialize embeddings model
         self.embeddings = HuggingFaceEmbeddings(

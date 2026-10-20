@@ -1,9 +1,7 @@
 from kafka import KafkaConsumer, KafkaProducer
 from send_post import LingoVoiceProcessor
 import json
-import logging
 import signal
-import sys
 from datetime import datetime
 import requests
 from data_ingestion_pipeline import LoadData
@@ -14,47 +12,40 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document as LangchainDocument
 from langchain.docstore import document
 import os
-from pathlib import Path
 from openai import OpenAI
 from spire.doc import *
 from spire.doc.common import *
 from SERVICES.web_scrape_service import WebScraper
 from myproject.runner import scrape_with_cli
+from logger_config import setup_logger
+from settings import Settings
 
-# Configure logging
-log_file_path = "logs/chat_data_ingestion_pipeline.log"
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(log_file_path),
-        logging.StreamHandler(sys.stdout)  # Keeps printing to console as well
-    ]
-)
-logger = logging.getLogger(__name__)
+settings = Settings.from_environment()
+logger = setup_logger(__name__, "chat_data_ingestion_pipeline.log")
 
 
 class KafkaLingoBridge:
     def __init__(self):
         self.running = True
         self.kafka_config = {
-            'bootstrap_servers': ['216.48.183.140:9092'],
-            'input_topic': 'chat-input',
-            'output_topic': 'chat_ai_output'
+            'bootstrap_servers': settings.kafka_bootstrap_servers,
+            'input_topic': settings.kafka_input_topic,
+            'output_topic': settings.kafka_output_topic
         }
         self.load_data = LoadData()
         self.consumer = None
         self.producer = None
-        project_dir = Path(__file__).resolve().parent
-        self.upload_dir = str(project_dir / "UPLOAD")
-        self.chroma_persist_dir = str(project_dir / "chroma_db")
-        self.processor = LingoVoiceProcessor("http://216.48.184.150:5999/LingoVoice/process_audio_url/")
-        self.scraped_json_path = str(project_dir / "myproject")
+        self.upload_dir = str(settings.upload_dir)
+        self.chroma_persist_dir = str(settings.chroma_persist_dir)
+        self.processor = LingoVoiceProcessor(
+            settings.processor_audio_url,
+            settings.processor_text_url,
+        )
+        self.scraped_json_path = str(settings.scraped_json_dir)
         # LLM client for summarization
         self.llm_client = OpenAI(
-            api_key="local-llm",
-            base_url="http://164.52.196.111:3005"  # Replace with actual LLM URL
+            api_key=settings.summary_llm_api_key,
+            base_url=settings.summary_llm_base_url,
         )
         self.document = Document()
         
