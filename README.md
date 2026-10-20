@@ -1,6 +1,6 @@
 # Chat With Anything - Intelligent Document Processing & Chat Assistant
 
-> **Project name update:** This project was previously named Vocally and is now
+> **Project name update:** This project is now
 > named **Chat With Anything** (`chat-with-anything`).
 
 ## Table of Contents
